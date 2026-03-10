@@ -57,7 +57,6 @@ class Settings(BaseSettings):
         return url
 
     def cookie_params(self) -> dict[str, Any]:
-        # In production you typically want Secure cookies.
         secure = self.REFRESH_TOKEN_COOKIE_SECURE if not self.is_production else True
         return {
             "httponly": True,

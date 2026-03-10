@@ -6,6 +6,7 @@ import { BookingFooter } from '@/app/layout/components/AppFooter/organisms/Booki
 import { DatePickerField } from '@/pages/BookingPage/components/FlightDatePicker/molecules/DatePickerField'
 import { FlightCardList } from '@/pages/BookingPage/components/FlightCards/organisms/FlightCardList'
 import { SeatSelectionPanel } from '@/pages/BookingPage/components/SeatSelection/organisms/SeatSelectionPanel'
+import { BookingChatWidget } from '@/pages/BookingPage/components/Chatbot/organisms/BookingChatWidget'
 import { useAppStore } from '@/store'
 import type { RootStore } from '@/store/store.types'
 
@@ -49,6 +50,8 @@ export default function BookingPage() {
           <SeatSelectionPanel />
         </Stack>
       </Container>
+
+      <BookingChatWidget />
 
       <BookingFooter />
     </Stack>
