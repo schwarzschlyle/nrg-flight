@@ -1,0 +1,190 @@
+-- =============================================================
+-- AIRPLANE TICKETING SERVICE — DATABASE SCHEMA
+-- Convention : snake_case, singular nouns, UUID surrogate PKs
+-- Timezone   : all timestamps stored in UTC (TIMESTAMPTZ)
+-- =============================================================
+
+
+-- -------------------------------------------------------------
+-- 1. USER ACCOUNT
+-- -------------------------------------------------------------
+CREATE TABLE account (
+    id                  UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
+    email               VARCHAR(254)    NOT NULL UNIQUE,
+    password_hash       TEXT            NOT NULL,
+    full_name           VARCHAR(120)    NOT NULL,
+    has_verified_email  BOOLEAN         NOT NULL DEFAULT FALSE,
+    is_active           BOOLEAN         NOT NULL DEFAULT TRUE,
+    created_at          TIMESTAMPTZ     NOT NULL DEFAULT now(),
+    updated_at          TIMESTAMPTZ     NOT NULL DEFAULT now(),
+    deleted_at          TIMESTAMPTZ                          -- soft delete
+);
+
+CREATE INDEX idx_account_email ON account (email);
+
+
+-- -------------------------------------------------------------
+-- 2. AIRCRAFT (plane template — defines the seat layout)
+-- -------------------------------------------------------------
+CREATE TABLE aircraft (
+    id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    model           VARCHAR(80) NOT NULL,          -- e.g. "Boeing 737-800"
+    total_rows      SMALLINT    NOT NULL CHECK (total_rows > 0),
+    seats_per_row   SMALLINT    NOT NULL CHECK (seats_per_row > 0),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+
+-- -------------------------------------------------------------
+-- 3. TIME SLOT  (24 fixed hourly slots — seeded once)
+--    Slot 0 = 00:00, slot 1 = 01:00, … slot 23 = 23:00
+-- -------------------------------------------------------------
+CREATE TABLE time_slot (
+    id          SMALLINT    PRIMARY KEY,           -- 0–23, natural key is stable here
+    label       VARCHAR(8)  NOT NULL UNIQUE,       -- "00:00", "01:00", … "23:00"
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT chk_time_slot_id CHECK (id BETWEEN 0 AND 23)
+);
+
+
+-- -------------------------------------------------------------
+-- 4. FLIGHT  (one record per calendar-date × time-slot)
+--    Each row = a unique, real-world departure instance.
+--    Seeded with flight_number + gate per time_slot_id;
+--    a new flight row is created for each date.
+-- -------------------------------------------------------------
+CREATE TABLE flight (
+    id              UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
+    time_slot_id    SMALLINT        NOT NULL REFERENCES time_slot (id),
+    aircraft_id     UUID            NOT NULL REFERENCES aircraft  (id),
+    flight_number   VARCHAR(10)     NOT NULL,      -- e.g. "AX-0400"
+    gate            VARCHAR(6)      NOT NULL,      -- e.g. "B12"
+    departure_date  DATE            NOT NULL,      -- UTC calendar date
+    -- derived departure moment (stored for convenience, documented as computed)
+    -- departure_at = departure_date + interval of time_slot hours (set by app layer)
+    is_active       BOOLEAN         NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMPTZ     NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ     NOT NULL DEFAULT now(),
+
+    -- One flight number per date (a flight number is unique on a given day)
+    CONSTRAINT uq_flight_number_date   UNIQUE (flight_number, departure_date),
+    -- One slot per date (only one departure per time slot per day)
+    CONSTRAINT uq_flight_slot_date     UNIQUE (time_slot_id, departure_date)
+);
+
+CREATE INDEX idx_flight_departure_date ON flight (departure_date);
+CREATE INDEX idx_flight_time_slot      ON flight (time_slot_id);
+CREATE INDEX idx_flight_aircraft       ON flight (aircraft_id);
+
+
+-- -------------------------------------------------------------
+-- 5. SEAT  (physical seats on a specific flight)
+--    Generated when a flight record is created (one row per seat).
+--    seat_code follows "1A", "1B", … layout.
+-- -------------------------------------------------------------
+CREATE TABLE seat (
+    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    flight_id   UUID        NOT NULL REFERENCES flight (id),
+    seat_code   VARCHAR(4)  NOT NULL,              -- e.g. "12C"
+    row_number  SMALLINT    NOT NULL CHECK (row_number > 0),
+    seat_letter CHAR(1)     NOT NULL,              -- A–F (or however wide the aircraft is)
+    is_booked   BOOLEAN     NOT NULL DEFAULT FALSE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT uq_seat_per_flight UNIQUE (flight_id, seat_code)
+);
+
+CREATE INDEX idx_seat_flight_id        ON seat (flight_id);
+CREATE INDEX idx_seat_flight_booked    ON seat (flight_id, is_booked);   -- composite: available-seat queries
+-- Partial index: fast lookup of only available seats
+CREATE INDEX idx_seat_available        ON seat (flight_id) WHERE is_booked = FALSE;
+
+
+-- -------------------------------------------------------------
+-- 6. BOOKING  (the transaction when a user claims a seat)
+--    Once created and confirmed, the seat is permanently taken.
+-- -------------------------------------------------------------
+CREATE TABLE booking (
+    id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    account_id      UUID        NOT NULL REFERENCES account (id),
+    seat_id         UUID        NOT NULL REFERENCES seat    (id),
+    flight_id       UUID        NOT NULL REFERENCES flight  (id),  -- denormalised for query convenience (documented)
+    -- status: pending → confirmed | cancelled
+    -- Using a lookup table instead of enum for easy future extension
+    status_id       SMALLINT    NOT NULL REFERENCES booking_status (id) DEFAULT 1,
+    booked_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    confirmed_at    TIMESTAMPTZ,
+    cancelled_at    TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    -- A seat can only ever be booked once (enforces permanent "taken" rule)
+    CONSTRAINT uq_booking_seat UNIQUE (seat_id)
+);
+
+CREATE INDEX idx_booking_account ON booking (account_id);
+CREATE INDEX idx_booking_flight  ON booking (flight_id);
+CREATE INDEX idx_booking_seat    ON booking (seat_id);
+
+
+-- -------------------------------------------------------------
+-- 7. BOOKING STATUS  (lookup table — avoids brittle enums)
+--    Seeded: 1=pending, 2=confirmed, 3=cancelled
+-- -------------------------------------------------------------
+CREATE TABLE booking_status (
+    id          SMALLINT    PRIMARY KEY,
+    label       VARCHAR(20) NOT NULL UNIQUE,   -- "pending", "confirmed", "cancelled"
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Note: booking.status_id FK references booking_status — add after table exists:
+ALTER TABLE booking
+    ADD CONSTRAINT fk_booking_status
+    FOREIGN KEY (status_id) REFERENCES booking_status (id);
+
+
+-- =============================================================
+-- SEED DATA
+-- =============================================================
+
+-- Booking statuses
+INSERT INTO booking_status (id, label) VALUES
+    (1, 'pending'),
+    (2, 'confirmed'),
+    (3, 'cancelled');
+
+-- 24 hourly time slots
+INSERT INTO time_slot (id, label) VALUES
+    ( 0, '00:00'), ( 1, '01:00'), ( 2, '02:00'), ( 3, '03:00'),
+    ( 4, '04:00'), ( 5, '05:00'), ( 6, '06:00'), ( 7, '07:00'),
+    ( 8, '08:00'), ( 9, '09:00'), (10, '10:00'), (11, '11:00'),
+    (12, '12:00'), (13, '13:00'), (14, '14:00'), (15, '15:00'),
+    (16, '16:00'), (17, '17:00'), (18, '18:00'), (19, '19:00'),
+    (20, '20:00'), (21, '21:00'), (22, '22:00'), (23, '23:00');
+
+
+-- =============================================================
+-- USEFUL VIEWS
+-- =============================================================
+
+-- Available seats for a given flight (frontend seat-map query)
+CREATE VIEW v_seat_availability AS
+SELECT
+    s.id            AS seat_id,
+    s.flight_id,
+    s.seat_code,
+    s.row_number,
+    s.seat_letter,
+    s.is_booked,
+    f.flight_number,
+    f.gate,
+    f.departure_date,
+    ts.label        AS departure_time
+FROM seat s
+JOIN flight     f  ON f.id  = s.flight_id
+JOIN time_slot  ts ON ts.id = f.time_slot_id;

@@ -1,15 +1,10 @@
 import { CssBaseline } from '@mui/material'
-import { ThemeProvider, createTheme } from '@mui/material/styles'
+import { ThemeProvider } from '@mui/material/styles'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import type { PropsWithChildren } from 'react'
 
-const theme = createTheme({
-  cssVariables: true,
-  palette: {
-    mode: 'light',
-  },
-})
+import { theme } from '@/app/theme/theme'
 
 export function AppProviders({ children }: PropsWithChildren) {
   const queryClient = useMemo(

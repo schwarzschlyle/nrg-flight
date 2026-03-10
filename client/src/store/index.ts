@@ -1,9 +1,12 @@
 import { create, type StateCreator } from 'zustand'
+import { persist } from 'zustand/middleware'
 
 import { createAuthSlice } from '@/store/slices/auth.slice'
 import { createBookingFlowSlice } from '@/store/slices/bookingFlow.slice'
 import { createTestPageSlice } from '@/store/slices/testPage.slice'
 import type { RootStore } from '@/store/store.types'
+
+const STORAGE_KEY = 'nrg-flight.store'
 
 const creator: StateCreator<RootStore> = (set, get) => ({
   ...createAuthSlice(),
@@ -12,6 +15,8 @@ const creator: StateCreator<RootStore> = (set, get) => ({
 
   setAccessToken: (token: string | null) => set({ auth: { ...get().auth, accessToken: token } }),
   setAdminAccessToken: (token: string | null) => set({ auth: { ...get().auth, adminAccessToken: token } }),
+  setAccount: (account) => set({ auth: { ...get().auth, account } }),
+  clearAuth: () => set({ auth: { accessToken: null, adminAccessToken: null, account: null } }),
 
   setTestPage: (patch) => set({ testPage: { ...get().testPage, ...patch } }),
 
@@ -35,4 +40,17 @@ const creator: StateCreator<RootStore> = (set, get) => ({
     }),
 })
 
-export const useAppStore = create<RootStore>()(creator)
+export const useAppStore = create<RootStore>()(
+  persist(creator, {
+    name: STORAGE_KEY,
+    version: 1,
+    partialize: (state) => ({
+      auth: {
+        accessToken: state.auth.accessToken,
+        adminAccessToken: state.auth.adminAccessToken,
+        account: null,
+      },
+      bookingFlow: state.bookingFlow,
+    }),
+  }),
+)

@@ -54,12 +54,6 @@ class Base(DeclarativeBase):
 def create_engine() -> AsyncEngine:
     # Neon URLs are usually `postgresql://...`; we normalize to `postgresql+asyncpg://...`.
     database_url = settings.normalize_database_url()
-
-    # asyncpg does NOT understand libpq-style query params like `sslmode`.
-    # SQLAlchemy will pass URL query items as keyword arguments to asyncpg.connect(),
-    # which raises: `TypeError: connect() got an unexpected keyword argument 'sslmode'`.
-    #
-    # We strip those params and translate the intent into asyncpg's supported `ssl` kwarg.
     url = make_url(database_url)
     query = dict(url.query)
 
@@ -74,8 +68,6 @@ def create_engine() -> AsyncEngine:
 
     url = url.set(query=query)
 
-    # Neon + serverless environments often prefer NullPool; for traditional servers you can
-    # use the default QueuePool. We default to NullPool to avoid exhausting pooled connections.
     return create_async_engine(url, pool_pre_ping=True, poolclass=NullPool, connect_args=connect_args)
 
 
