@@ -101,7 +101,7 @@ export function BookingChatWidget() {
             <Stack px={2} py={1.5} spacing={0.25}>
               <Typography fontWeight={950}>Chat assistant</Typography>
               <Typography variant="caption" color="text.secondary">
-                Uses live booking data. Will ask to confirm before booking.
+                Feel free to ask about available flights, seat availability, or book a seat at a specific time!
               </Typography>
             </Stack>
 
