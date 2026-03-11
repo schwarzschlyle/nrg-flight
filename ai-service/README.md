@@ -18,11 +18,6 @@ poetry install
 poetry run uvicorn ai_service.main:app --host 0.0.0.0 --port 3000 --reload
 ```
 
-#### LangGraph tool runtime notes
-
-This service is pinned to `langchain-core >=0.3.x` + `langgraph 0.2.x`. In these versions,
-tools no longer receive a `ToolRuntime` object.
-
 If a tool needs access to the graph state or the current tool call id, use:
 
 - `state: Annotated[dict, langgraph.prebuilt.InjectedState]`

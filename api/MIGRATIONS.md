@@ -6,34 +6,6 @@ This project uses **Alembic** to manage schema changes.
 
 Set `DATABASE_URL` in `api/.env`.
 
-Neon provides URLs like:
-
-```text
-postgresql://user:pass@host/db?sslmode=require
-```
-
-Important notes:
-
-- **Do not wrap** the URL in single-quotes in `.env`. Use:
-
-  ```dotenv
-  DATABASE_URL=postgresql://user:pass@host/db?sslmode=require
-  ```
-
-  not:
-
-  ```dotenv
-  DATABASE_URL='postgresql://user:pass@host/db?sslmode=require'
-  ```
-
-- Our async SQLAlchemy setup strips libpq-only params like `sslmode`/`channel_binding`
-  and converts them into asyncpg-compatible `connect_args`.
-
-- Alembic must connect with the **real password**. Internally we use
-  `URL.render_as_string(hide_password=False)` for online migrations because
-  `str(URL)` masks passwords (replaces them with `***`).
-
-The app automatically normalizes `postgresql://` to `postgresql+asyncpg://` for runtime.
 
 ## 2) Apply migrations
 
