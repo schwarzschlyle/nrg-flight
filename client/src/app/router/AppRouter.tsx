@@ -7,6 +7,7 @@ import { useAppStore } from '@/store'
 
 import { RequireAdmin } from './guards/RequireAdmin'
 import { RequireAuth } from './guards/RequireAuth'
+import { RedirectIfAuthed } from './guards/RedirectIfAuthed'
 import { navigate } from './navigation'
 
 import AdminPage from '@/pages/AdminPage/page'
@@ -26,20 +27,26 @@ export function AppRouter() {
 
   useEffect(() => {
     if (pathname === routes.root) {
-      const token = useAppStore.getState().auth.accessToken ?? useAppStore.getState().auth.adminAccessToken
-      navigate(token ? routes.booking : routes.login, { replace: true })
+      // Treat the root path as the app's "entry" page.
+      // For a first-time visitor, we want to land on /login.
+      // Already-authenticated users will be redirected to /booking by <RedirectIfAuthed>.
+      navigate(routes.login, { replace: true })
     }
   }, [pathname])
 
   if (pathname === routes.login) {
     return (
-      <LoginPage />
+      <RedirectIfAuthed>
+        <LoginPage />
+      </RedirectIfAuthed>
     )
   }
 
   if (pathname === routes.register) {
     return (
-      <RegisterPage />
+      <RedirectIfAuthed>
+        <RegisterPage />
+      </RedirectIfAuthed>
     )
   }
 
