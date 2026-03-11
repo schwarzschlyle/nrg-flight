@@ -199,6 +199,33 @@ You’ll see this pattern across pages, for example:
 
 ---
 
+## State management (Zustand)
+
+The client uses **Zustand** for lightweight global state.
+
+Entry point:
+
+- `client/src/store/index.ts` exports `useAppStore`
+
+Store design:
+
+- The store is built from **slices**:
+  - `auth.slice.ts` — auth tokens + account state
+  - `bookingFlow.slice.ts` — date/slot/flight/seat selection for booking
+  - `testPage.slice.ts` — state used by the internal test page
+- The store uses `zustand/middleware` **persist** with key `nrg-flight.store`.
+  - Only a subset is persisted (`partialize`) — mainly tokens + booking flow.
+  - The `account` object is intentionally not persisted (it’s cleared to `null` on reload).
+
+In components, state is accessed via selectors, e.g.:
+
+```ts
+const departureDate = useAppStore((s) => s.bookingFlow.departureDate)
+const setDepartureDate = useAppStore((s) => s.setDepartureDate)
+```
+
+---
+
 ## Local development
 
 Even though the default `docker-compose.yml` uses prebuilt GHCR images, you can build locally using:
