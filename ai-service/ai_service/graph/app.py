@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import AIMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.graph import START, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -36,16 +36,29 @@ tools = [
 ]
 
 
-llm = ChatOpenAI(
-    openai_api_key=settings.OPENAI_API_KEY,
-    model=settings.OPENAI_MODEL,
-    temperature=0.2,
-)
-
-llm_with_tools = llm.bind_tools(tools)
+llm_with_tools = None
+if settings.openai_enabled:
+    llm = ChatOpenAI(
+        openai_api_key=settings.OPENAI_API_KEY,
+        model=settings.OPENAI_MODEL,
+        temperature=0.2,
+    )
+    llm_with_tools = llm.bind_tools(tools)
 
 
 async def chatbot_node(state: GraphState) -> GraphState:
+    if llm_with_tools is None:
+        return {
+            "messages": [
+                AIMessage(
+                    content=(
+                        "AI chat is currently disabled because OPENAI_API_KEY is not set. "
+                        "Set OPENAI_API_KEY in ai-service/.env and restart the container."
+                    )
+                )
+            ]
+        }
+
     messages = state.get("messages", [])
 
     sys = [SystemMessage(content=SYSTEM_PROMPT)]
@@ -65,6 +78,7 @@ async def chatbot_node(state: GraphState) -> GraphState:
 
     response = await llm_with_tools.ainvoke([*sys, *messages])
     return {"messages": [response]}
+
 
 
 builder = StateGraph(GraphState)

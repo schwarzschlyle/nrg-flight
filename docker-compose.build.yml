@@ -1,0 +1,20 @@
+# Local development override.
+
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up --build
+
+services:
+  api:
+    image: nrg-flight-api:dev
+    build:
+      context: ./api
+
+  ai-service:
+    image: nrg-flight-ai-service:dev
+    build:
+      context: ./ai-service
+
+  client:
+    image: nrg-flight-client:dev
+    build:
+      context: ./client

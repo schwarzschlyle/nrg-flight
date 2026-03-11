@@ -1,0 +1,28 @@
+services:
+  api:
+    image: ghcr.io/schwarzschlyle/nrg-flight-api:latest
+    pull_policy: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api/.env:/app/.env:ro
+
+  ai-service:
+    image: ghcr.io/schwarzschlyle/nrg-flight-ai-service:latest
+    pull_policy: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./ai-service/.env:/app/.env:ro
+
+  client:
+    image: ghcr.io/schwarzschlyle/nrg-flight-client:latest
+    pull_policy: always
+    ports:
+      - "5173:5173"
+    env_file:
+      - ./client/.env
+    depends_on:
+      - api
+      - ai-service
+
