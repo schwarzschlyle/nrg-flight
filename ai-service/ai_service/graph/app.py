@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from langchain_core.messages import AIMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.graph import START, StateGraph
@@ -61,7 +63,16 @@ async def chatbot_node(state: GraphState) -> GraphState:
 
     messages = state.get("messages", [])
 
-    sys = [SystemMessage(content=SYSTEM_PROMPT)]
+    # Provide the model with a reliable "today" context to interpret relative dates.
+    now_local = datetime.now().astimezone()
+    today_context = (
+        "Today's date is "
+        f"{now_local.strftime('%Y-%m-%d')} "
+        f"({now_local.strftime('%A')}) "
+        f"in timezone {now_local.tzname() or 'local'} (ISO: {now_local.isoformat(timespec='seconds')})."
+    )
+
+    sys = [SystemMessage(content=SYSTEM_PROMPT), SystemMessage(content=today_context)]
     pending = state.get("pending_booking")
     if pending:
         sys.append(
