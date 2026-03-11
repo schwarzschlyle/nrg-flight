@@ -29,6 +29,12 @@ function parseSseBlock(raw: string): { event: string; data: unknown } | null {
   }
 }
 
+type SseDataByEvent = {
+  meta: { request_id: string }
+  delta: { text: string }
+  state: { pending_booking: PendingBooking }
+}
+
 export async function streamChat(args: {
   message: string
   history: ChatMsg[]
@@ -60,9 +66,10 @@ export async function streamChat(args: {
   const decoder = new TextDecoder()
   let buffer = ''
 
-  const emit = (event: SseEvent['event'], data: any) => {
-    if (event === 'delta') args.onDelta(String(data.text ?? ''))
-    if (event === 'state') args.onState((data.pending_booking ?? null) as PendingBooking)
+  const emit = (event: SseEvent['event'], data: unknown) => {
+    const d = (data ?? {}) as Partial<SseDataByEvent[typeof event]>
+    if (event === 'delta') args.onDelta(String((d as Partial<SseDataByEvent['delta']>).text ?? ''))
+    if (event === 'state') args.onState(((d as Partial<SseDataByEvent['state']>).pending_booking ?? null) as PendingBooking)
   }
 
   while (true) {

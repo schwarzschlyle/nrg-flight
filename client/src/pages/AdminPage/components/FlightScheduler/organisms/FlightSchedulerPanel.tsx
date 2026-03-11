@@ -2,7 +2,7 @@ import AddRoadRoundedIcon from '@mui/icons-material/AddRoadRounded'
 import { Alert, Box, Button, CircularProgress, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material'
 import { alpha } from '@mui/material/styles'
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import { useCreateFlightMutation } from '@/app/api/mutations/useCreateFlightMutation'
 import { useAircraftQuery } from '@/app/api/queries/useAircraftQuery'
@@ -21,16 +21,16 @@ export function FlightSchedulerPanel() {
 
   const slotOptions = useMemo(() => getTimeSlotOptions('24h'), [])
 
-  useEffect(() => {
-    const ids = (aircraftQuery.data ?? []).map((a) => a.id)
-    if (ids.length === 0) return
-    if (aircraftId && ids.includes(aircraftId)) return
-    setAircraftId(ids[0])
-  }, [aircraftId, aircraftQuery.data])
-
   const aircraftOptions = useMemo(() => aircraftQuery.data ?? [], [aircraftQuery.data])
+  const activeAircraftId = useMemo(() => {
+    const ids = aircraftOptions.map((a) => a.id)
+    if (ids.length === 0) return null
+    if (aircraftId && ids.includes(aircraftId)) return aircraftId
+    return ids[0]
+  }, [aircraftId, aircraftOptions])
+
   const busy = createFlight.isPending
-  const canSubmit = !!aircraftId && slotId >= 0 && slotId <= 23
+  const canSubmit = !!activeAircraftId && slotId >= 0 && slotId <= 23
 
   return (
     <Paper
@@ -85,7 +85,7 @@ export function FlightSchedulerPanel() {
               <TextField
                 label="Aircraft"
                 select
-                value={aircraftId ?? ''}
+                value={activeAircraftId ?? ''}
                 onChange={(e) => setAircraftId(e.target.value || null)}
                 disabled={aircraftQuery.isLoading || aircraftQuery.isError}
                 sx={{ flex: '2 1 280px', minWidth: 0 }}
@@ -122,10 +122,10 @@ export function FlightSchedulerPanel() {
               <Button
                 variant="contained"
                 onClick={async () => {
-                  if (!aircraftId) return
+                  if (!activeAircraftId) return
                   await createFlight.mutateAsync({
                     time_slot_id: slotId,
-                    aircraft_id: aircraftId,
+                    aircraft_id: activeAircraftId,
                     departure_date: departureDate,
                   })
                   await queryClient.invalidateQueries({ queryKey: ['slots', departureDate] })

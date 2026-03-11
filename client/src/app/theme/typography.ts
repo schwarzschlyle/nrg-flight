@@ -1,6 +1,7 @@
-import type { TypographyOptions } from '@mui/material/styles'
+import type { ThemeOptions } from '@mui/material/styles'
 
-export const typography: TypographyOptions = {
+// MUI type exports have shifted between major versions; ThemeOptions is stable.
+export const typography: NonNullable<ThemeOptions['typography']> = {
   fontFamily: [
     'system-ui',
     '-apple-system',
